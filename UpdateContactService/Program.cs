@@ -1,5 +1,5 @@
-using CreateContactService.Messaging;
 using TechChallenge.Infrastructure.Messaging;
+using UpdateContactService.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,7 +8,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<IRabbitMQPublisher, RabbitMQCreatePublisher>();
+builder.Services.AddSingleton<IRabbitMQPublisher, RabbitMQUpdatePublisher>();
 
 var app = builder.Build();
 
@@ -20,7 +20,8 @@ app.UseSwaggerUI(c =>
 });
 
 //app.UseHttpsRedirection();
-app.UseAuthorization(); ;
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+

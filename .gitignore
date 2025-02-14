@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/DataPersistenceService/wwwroot/lib/bootstrap/dist/js
+/DataPersistenceService/wwwroot
+/DeleteContactService/wwwroot
+/GetContactService/wwwroot
+/UpdateContactService/wwwroot
