@@ -11,7 +11,7 @@ namespace DataPersistenceService.Messaging
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DeleteRabbitMQConsumer> _logger;
-        private readonly string _hostname = "localhost";
+        private readonly string _hostname = "rabbitmq-service";
         private readonly string _queueName = "delete_contact_queue";
 
         public DeleteRabbitMQConsumer(IServiceProvider serviceProvider, ILogger<DeleteRabbitMQConsumer> logger)

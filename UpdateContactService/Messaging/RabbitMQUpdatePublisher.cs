@@ -7,7 +7,7 @@ namespace UpdateContactService.Messaging
 {
     public class RabbitMQUpdatePublisher : IRabbitMQPublisher
     {
-        private readonly string _hostname = "localhost";
+        private readonly string _hostname = "rabbitmq-service";
 
         public async Task Publish<T>(T message, string queueName)
         {

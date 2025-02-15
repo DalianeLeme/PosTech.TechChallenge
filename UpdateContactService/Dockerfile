@@ -36,7 +36,7 @@ COPY --from=build /app/out .
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Exposição da porta do microsserviço
-EXPOSE 5000
+ENV ASPNETCORE_URLS=http://+:80
 
 # Executa o microsserviço
 ENTRYPOINT ["dotnet", "UpdateContactService.dll"]

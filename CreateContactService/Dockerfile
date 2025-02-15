@@ -27,7 +27,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:5000
 
 # Expor a porta do microsserviço
-EXPOSE 5000
+ENV ASPNETCORE_URLS=http://+:80
 
 # Inicia o microsserviço
 ENTRYPOINT ["dotnet", "CreateContactService.dll"]

@@ -30,8 +30,11 @@ RUN dotnet publish -c Release -o /app/out
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
+# Expõe as portas 80 e 8080 para comunicação
 # Copia o build gerado para o contêiner final
 COPY --from=build /app/out .
+
+ENV ASPNETCORE_URLS=http://+:80
 
 # Define o ponto de entrada
 ENTRYPOINT ["dotnet", "DataPersistenceService.dll"]

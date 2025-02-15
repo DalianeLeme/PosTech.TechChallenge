@@ -7,7 +7,7 @@ namespace DeleteContactService.Messaging
 {
     public class RabbitMQDeletePublisher : IRabbitMQPublisher
     {
-        private readonly string _hostname = "localhost";
+        private readonly string _hostname = "rabbitmq-service";
 
         public async Task Publish<T>(T message, string queueName)
         {

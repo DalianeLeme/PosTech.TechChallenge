@@ -6,6 +6,8 @@ using TechChallenge.Infrastructure.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.UseUrls("http://+:80");
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -34,8 +36,8 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Create Contact Service API V1");
-    c.RoutePrefix = string.Empty; // Define a rota raiz como o Swagger UI
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Persist Contacts API V1");
+    c.RoutePrefix = "swagger"; // Agora o Swagger estará acessível em /swagger
 });
 
 // Consumidores

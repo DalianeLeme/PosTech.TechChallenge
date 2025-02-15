@@ -13,7 +13,7 @@ namespace DataPersistenceService.Messaging
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<UpdateRabbitMQConsumer> _logger;
-        private readonly string _hostname = "localhost";
+        private readonly string _hostname = "rabbitmq-service";
         private readonly string _queueName = "update_contact_queue";
         private static UpdateContactResponse? _lastUpdatedContact;
 

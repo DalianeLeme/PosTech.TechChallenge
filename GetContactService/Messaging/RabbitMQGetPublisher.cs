@@ -7,7 +7,7 @@ namespace GetContactService.Messaging
 {
     public class RabbitMQGetPublisher : IRabbitMQPublisher
     {
-        private readonly string _hostname = "localhost";  // Endereço do RabbitMQ
+        private readonly string _hostname = "rabbitmq-service";  // Endereço do RabbitMQ
 
         public async Task Publish<T>(T message, string queueName)
         {
