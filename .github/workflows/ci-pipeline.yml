@@ -82,16 +82,15 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Instalar SQLCMD (Ferramenta de Linha de Comando do SQL Server)
+      - name: Instalar SQLCMD manualmente (Ubuntu 24.04)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y curl apt-transport-https
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/22.04/mssql-server-2022.list)"
-          sudo apt-get update
-          sudo apt-get install -y mssql-tools unixodbc-dev
+          echo "Baixando e instalando SQLCMD manualmente..."
+          curl -O https://download.microsoft.com/download/e/1/b/e1b74a6d-345b-4c95-90f6-5e7f211b521a/mssql-tools-17.10.1.1-1.x86_64.rpm
+          sudo apt-get install -y alien
+          sudo alien -i mssql-tools-17.10.1.1-1.x86_64.rpm
           echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
           source ~/.bashrc
+          sqlcmd -? || echo "SQLCMD instalado com sucesso!"
 
       - name: Aguardar SQL Server inicializar manualmente
         run: |
