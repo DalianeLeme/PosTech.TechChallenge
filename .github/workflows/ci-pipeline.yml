@@ -24,6 +24,31 @@ jobs:
       - name: Compilar todos os projetos
         run: dotnet build --configuration Debug --no-restore
 
+  unit_tests:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar dependências
+        run: dotnet restore
+
+      - name: Compilar testes unitários
+        run: dotnet build --configuration Debug --no-restore
+
+      - name: Executar testes unitários
+        run: |
+          dotnet test TechChallenge.Application.UnitTests/TechChallenge.Application.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+          dotnet test TechChallenge.Domain.UnitTests/TechChallenge.Domain.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+          dotnet test TechChallenge.Infrastructure.UnitTests/TechChallenge.Infrastructure.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+
   integration_tests:
     runs-on: ubuntu-latest
     needs: build
@@ -39,6 +64,10 @@ jobs:
         ports:
           - 1433:1433
         options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 15s
+          --health-retries 40
           --memory="2g"
           --cpus="2"
 
@@ -57,28 +86,16 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Instalar SQLCMD corretamente
-        run: |
-          echo "Baixando e instalando SQLCMD..."
-          sudo apt-get update
-          sudo apt-get install -y curl gnupg2 apt-transport-https
-          curl -s https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/20.04/prod.list)"
-          sudo apt-get update
-          sudo apt-get install -y mssql-tools unixodbc-dev
-          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-          source ~/.bashrc
-
       - name: Verificar SQL Server até estar pronto
         run: |
           echo "⏳ Aguardando SQL Server iniciar..."
-          for i in {1..20}; do
-            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1" > /dev/null 2>&1
+          for i in {1..30}; do
+            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1" > /dev/null 2>&1
             if [ $? -eq 0 ]; then
               echo "SQL Server está pronto!"
               exit 0
             fi
-            echo "SQL Server ainda não está pronto... Tentativa $i de 20"
+            echo "SQL Server ainda não está pronto... Tentativa $i de 30"
             sleep 5
           done
           echo "SQL Server não inicializou a tempo"
@@ -87,9 +104,9 @@ jobs:
       - name: Criar banco de dados antes dos testes
         run: |
           echo "Criando banco de dados..."
-          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
         env:
-          ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
