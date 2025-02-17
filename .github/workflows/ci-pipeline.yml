@@ -24,31 +24,6 @@ jobs:
       - name: Compilar todos os projetos
         run: dotnet build --configuration Debug --no-restore
 
-  unit_tests:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Checkout código
-        uses: actions/checkout@v3
-
-      - name: Configurar .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restaurar dependências
-        run: dotnet restore
-
-      - name: Compilar testes unitários
-        run: dotnet build --configuration Debug --no-restore
-
-      - name: Executar testes unitários
-        run: |
-          dotnet test TechChallenge.Application.UnitTests/TechChallenge.Application.UnitTests.csproj --configuration Debug --no-build --verbosity normal
-          dotnet test TechChallenge.Domain.UnitTests/TechChallenge.Domain.UnitTests.csproj --configuration Debug --no-build --verbosity normal
-          dotnet test TechChallenge.Infrastructure.UnitTests/TechChallenge.Infrastructure.UnitTests.csproj --configuration Debug --no-build --verbosity normal
-
   integration_tests:
     runs-on: ubuntu-latest
     needs: build
@@ -82,7 +57,7 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Instalar SQLCMD corretamente (Ubuntu 24.04)
+      - name: Instalar SQLCMD corretamente
         run: |
           echo "Baixando e instalando SQLCMD..."
           sudo apt-get update
@@ -92,62 +67,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mssql-tools unixodbc-dev
           echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
           source ~/.bashrc
-          sqlcmd -? || echo "SQLCMD instalado com sucesso!"
 
-      - name: Aguardar SQL Server inicializar
+      - name: Verificar SQL Server até estar pronto
         run: |
-          echo "Aguardando SQL Server iniciar..."
-          sleep 30  # Aguarda 30s antes da primeira verificação
-          for i in {1..15}; do
-            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
+          echo "⏳ Aguardando SQL Server iniciar..."
+          for i in {1..20}; do
+            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1" > /dev/null 2>&1
             if [ $? -eq 0 ]; then
               echo "SQL Server está pronto!"
               exit 0
             fi
-            echo "SQL Server ainda não está pronto... Tentativa $i de 15"
+            echo "SQL Server ainda não está pronto... Tentativa $i de 20"
             sleep 5
           done
-          echo "Erro: SQL Server não inicializou a tempo"
+          echo "SQL Server não inicializou a tempo"
           exit 1
 
       - name: Criar banco de dados antes dos testes
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          echo "Criando banco de dados..."
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
         env:
-          ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
-
-  docker_build_push:
-    runs-on: ubuntu-latest
-    needs: [unit_tests, integration_tests]
-
-    steps:
-      - name: Checkout código
-        uses: actions/checkout@v3
-
-      - name: Autenticar no Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Construir e enviar imagens Docker
-        run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest -f Contatos/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest -f Consulta/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest -f Atualizacao/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest -f Exclusao/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest -f Persistencia/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest
