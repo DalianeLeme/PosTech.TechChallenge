@@ -67,7 +67,7 @@ jobs:
           --health-interval 5s
           --health-timeout 10s
           --health-retries 20
-          --user root  # 🚀 Força execução como root para evitar problemas de permissão
+          --user root  
 
     steps:
       - name: Checkout código
