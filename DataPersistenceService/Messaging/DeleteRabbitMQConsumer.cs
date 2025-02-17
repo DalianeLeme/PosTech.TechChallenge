@@ -7,12 +7,18 @@ using TechChallenge.Application.Services;
 
 namespace DataPersistenceService.Messaging
 {
-    public class DeleteRabbitMQConsumer
+    public class DeleteRabbitMQConsumer : IAsyncDisposable
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DeleteRabbitMQConsumer> _logger;
-        private readonly string _hostname = "rabbitmq-service";
+        private readonly string _hostname = Environment.GetEnvironmentVariable("RABBITMQ_HOST") ?? "rabbitmq-service.default.svc.cluster.local";
+        private readonly int _port = int.TryParse(Environment.GetEnvironmentVariable("RABBITMQ_PORT"), out var port) ? port : 5672;
+        private readonly string _username = Environment.GetEnvironmentVariable("RABBITMQ_USER") ?? "guest";
+        private readonly string _password = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD") ?? "guest";
         private readonly string _queueName = "delete_contact_queue";
+
+        private IConnection _connection;
+        private IChannel _channel;
 
         public DeleteRabbitMQConsumer(IServiceProvider serviceProvider, ILogger<DeleteRabbitMQConsumer> logger)
         {
@@ -22,10 +28,22 @@ namespace DataPersistenceService.Messaging
 
         public async Task StartConsumingAsync()
         {
-            var retryPolicy = Policy.Handle<Exception>().RetryAsync(3);
+            var retryPolicy = Policy.Handle<Exception>().RetryAsync(3, onRetry: (exception, retryCount) =>
+            {
+                _logger.LogWarning($"Retry {retryCount} devido a erro: {exception.Message}");
+            });
+
             var circuitBreakerPolicy = Policy.Handle<Exception>().CircuitBreakerAsync(
                 exceptionsAllowedBeforeBreaking: 2,
-                durationOfBreak: TimeSpan.FromSeconds(10));
+                durationOfBreak: TimeSpan.FromSeconds(10),
+                onBreak: (exception, duration) =>
+                {
+                    _logger.LogWarning($"Circuito aberto devido a erro: {exception.Message}. Reiniciará em {duration.TotalSeconds} segundos.");
+                },
+                onReset: () =>
+                {
+                    _logger.LogInformation("Circuito fechado. Operações retomadas.");
+                });
 
             var combinedPolicy = Policy.WrapAsync(retryPolicy, circuitBreakerPolicy);
 
@@ -33,88 +51,104 @@ namespace DataPersistenceService.Messaging
             {
                 await combinedPolicy.ExecuteAsync(async () =>
                 {
+                    await InitializeRabbitMQAsync();
                     await StartConsumingInternalAsync();
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Erro ao executar o consumidor: {ex.Message}");
+                _logger.LogError($"Erro crítico ao executar consumidor: {ex.Message}");
             }
         }
 
-        private async Task StartConsumingInternalAsync()
+        private async Task InitializeRabbitMQAsync()
         {
             try
             {
-                _logger.LogInformation("Inicializando o consumidor...");
-
-                var factory = new ConnectionFactory
+                var factory = new ConnectionFactory()
                 {
                     HostName = _hostname,
+                    Port = _port,
+                    UserName = _username,
+                    Password = _password,
                     RequestedHeartbeat = TimeSpan.FromSeconds(30)
                 };
 
-                using var connection = await factory.CreateConnectionAsync();
-                using var channel = await connection.CreateChannelAsync();
+                _logger.LogInformation("Tentando estabelecer conexão com RabbitMQ...");
+                _connection = await factory.CreateConnectionAsync();
+                _channel = await _connection.CreateChannelAsync();
 
-                await channel.QueueDeclareAsync(
+                await _channel.QueueDeclareAsync(
                     queue: _queueName,
                     durable: true,
                     exclusive: false,
                     autoDelete: false,
                     arguments: null);
 
-                var consumer = new AsyncEventingBasicConsumer(channel);
-
-                consumer.ReceivedAsync += async (model, ea) =>
-                {
-                    var body = ea.Body.ToArray();
-                    var message = Encoding.UTF8.GetString(body);
-
-                    try
-                    {
-                        _logger.LogInformation($"Mensagem recebida da fila {_queueName}: {message}");
-
-                        var contactId = JsonSerializer.Deserialize<Guid>(message);
-                        if (contactId != Guid.Empty)
-                        {
-                            using var scope = _serviceProvider.CreateScope();
-                            var contactService = scope.ServiceProvider.GetRequiredService<IContactService>();
-
-                            _logger.LogInformation($"Processando exclusão do contato: {contactId}");
-                            await contactService.DeleteContact(contactId);
-
-                            _logger.LogInformation($"Contato {contactId} excluído com sucesso.");
-                            await channel.BasicAckAsync(ea.DeliveryTag, false);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Mensagem inválida: GUID vazio.");
-                            await channel.BasicNackAsync(ea.DeliveryTag, false, false);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Erro ao processar mensagem: {ex.Message}");
-                        await channel.BasicNackAsync(ea.DeliveryTag, false, false);
-                    }
-                };
-
-                await channel.BasicConsumeAsync(
-                    queue: _queueName,
-                    autoAck: false,
-                    consumer: consumer);
-
-                _logger.LogInformation($"Consumidor iniciado na fila {_queueName}");
-
-                await Task.Delay(Timeout.Infinite);
+                _logger.LogInformation($"Conectado ao RabbitMQ e fila {_queueName} declarada.");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Erro ao inicializar consumidor: {ex.Message}");
+                _logger.LogError($"Erro ao conectar ao RabbitMQ: {ex.Message}");
                 throw;
             }
         }
-    }
 
+        private async Task StartConsumingInternalAsync()
+        {
+            _logger.LogInformation("Inicializando o consumidor...");
+
+            var consumer = new AsyncEventingBasicConsumer(_channel);
+            consumer.ReceivedAsync += async (model, ea) =>
+            {
+                var body = ea.Body.ToArray();
+                var message = Encoding.UTF8.GetString(body);
+
+                try
+                {
+                    _logger.LogInformation($"Mensagem recebida da fila {_queueName}: {message}");
+
+                    var contactId = JsonSerializer.Deserialize<Guid>(message);
+                    if (contactId != Guid.Empty)
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        var contactService = scope.ServiceProvider.GetRequiredService<IContactService>();
+
+                        _logger.LogInformation($"Processando exclusão do contato: {contactId}");
+                        await contactService.DeleteContact(contactId);
+
+                        _logger.LogInformation($"Contato {contactId} excluído com sucesso.");
+                        await _channel.BasicAckAsync(ea.DeliveryTag, false);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Mensagem inválida: GUID vazio.");
+                        await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Erro ao processar mensagem: {ex.Message}");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                }
+            };
+
+            await _channel.BasicConsumeAsync(queue: _queueName, autoAck: false, consumer: consumer);
+
+            _logger.LogInformation($"Consumidor iniciado na fila {_queueName}");
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _logger.LogInformation("Finalizando consumidor e fechando conexões...");
+            if (_channel is not null)
+            {
+                await _channel.CloseAsync();
+            }
+            if (_connection is not null)
+            {
+                await _connection.CloseAsync();
+            }
+        }
+    }
 }

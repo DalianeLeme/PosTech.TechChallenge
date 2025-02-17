@@ -1,5 +1,6 @@
 using CreateContactService.Messaging;
 using TechChallenge.Infrastructure.Messaging;
+using Prometheus; // Adicionar Prometheus
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +20,11 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = string.Empty; // Define a rota raiz como o Swagger UI
 });
 
-//app.UseHttpsRedirection();
-app.UseAuthorization(); ;
+// Adicionando suporte ao Prometheus
+app.UseRouting();
+app.UseAuthorization();
+app.UseHttpMetrics(); // Middleware para coletar métricas HTTP
 app.MapControllers();
+app.MapMetrics(); // Expõe /metrics para Prometheus
 
 app.Run();

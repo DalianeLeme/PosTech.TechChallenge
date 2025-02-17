@@ -8,9 +8,9 @@ metadata:
   annotations:
     description: "Configuração do microsserviço de Persistência de Dados."
 data:
-  RABBITMQ_HOST: "rabbitmq.default.svc.cluster.local"
+  RABBITMQ_HOST: "rabbitmq-service"
   RABBITMQ_PORT: "5672"
   RABBITMQ_USER: "guest"
   RABBITMQ_PASSWORD: "guest"
   APP_SETTING: "DataPersistenceSpecificConfig"
-  SQLSERVER_CONNECTION_STRING: "Server=sqlserver.default.svc.cluster.local;Database=TechChallengeDB;User Id=sa;Password=your_password;"
+  SQLSERVER_CONNECTION_STRING: "Server=mssql-service,1433;Database=Contacts;User Id=sa;Password=NovaSenhaForte123;TrustServerCertificate=True;Encrypt=False;"

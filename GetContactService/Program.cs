@@ -1,5 +1,6 @@
 using GetContactService.Messaging;
 using TechChallenge.Infrastructure.Messaging;
+using Prometheus; // Adicionar Prometheus
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,12 +16,15 @@ app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "Create Contact Service API V1");
-    c.RoutePrefix = string.Empty; // Define a rota raiz como o Swagger UI
+    c.RoutePrefix = string.Empty;
 });
 
-//app.UseHttpsRedirection();
+// Adicionando suporte ao Prometheus
+app.UseRouting(); // Necessário para MapMetrics()
+app.UseHttpMetrics(); // Middleware para coletar métricas HTTP
+
 app.UseAuthorization();
 app.MapControllers();
+app.MapMetrics(); // Expõe /metrics para Prometheus
 
 app.Run();
-

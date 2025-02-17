@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Polly" Version="8.5.2" />
+    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
     <PackageReference Include="RabbitMQ.Client" Version="7.0.0" />
   </ItemGroup>
 

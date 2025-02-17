@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s  # Tempo entre coletas
+
+    scrape_configs:
+      - job_name: 'kubernetes'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'microservices'
+        static_configs:
+          - targets:
+              - '192.168.65.3:32623'  # create-contact-service
+              - '192.168.65.3:31081'  # delete-contact-service
+              - '192.168.65.3:32759'  # get-contact-service
+              - '192.168.65.3:32660'  # update-contact-service

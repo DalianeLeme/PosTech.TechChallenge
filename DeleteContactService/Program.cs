@@ -1,5 +1,6 @@
 using DeleteContactService.Messaging;
 using TechChallenge.Infrastructure.Messaging;
+using Prometheus; // Adicionar Prometheus
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,12 +17,15 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Create Contact Service API V1");
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Delete Contact Service API V1");
     c.RoutePrefix = string.Empty; // Define a rota raiz como o Swagger UI
 });
 
-//app.UseHttpsRedirection();
+// Adicionando suporte ao Prometheus
+app.UseRouting();
 app.UseAuthorization();
+app.UseHttpMetrics(); // Middleware para coletar métricas HTTP
 app.MapControllers();
+app.MapMetrics(); // Expõe /metrics para Prometheus
 
 app.Run();

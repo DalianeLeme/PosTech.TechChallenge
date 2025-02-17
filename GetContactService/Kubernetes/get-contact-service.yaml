@@ -7,7 +7,7 @@ spec:
   selector:
     app: get-contact
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 80
-    nodePort: 32759
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 32759
