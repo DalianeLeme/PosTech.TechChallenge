@@ -82,22 +82,26 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Instalar SQLCMD manualmente (Ubuntu 24.04)
+      - name: Instalar SQLCMD corretamente (Ubuntu 24.04)
         run: |
-          echo "Baixando e instalando SQLCMD manualmente..."
-          curl -O https://download.microsoft.com/download/e/1/b/e1b74a6d-345b-4c95-90f6-5e7f211b521a/mssql-tools-17.10.1.1-1.x86_64.rpm
-          sudo apt-get install -y alien
-          sudo alien -i mssql-tools-17.10.1.1-1.x86_64.rpm
+          echo "Baixando e instalando SQLCMD..."
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg2 apt-transport-https
+          curl -s https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/20.04/prod.list)"
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
           echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
           source ~/.bashrc
           sqlcmd -? || echo "SQLCMD instalado com sucesso!"
 
-      - name: Aguardar SQL Server inicializar manualmente
+      - name: Aguardar SQL Server inicializar
         run: |
           echo "Aguardando SQL Server iniciar..."
           sleep 30  # Aguarda 30s antes da primeira verificação
           for i in {1..15}; do
-            sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
+            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
             if [ $? -eq 0 ]; then
               echo "SQL Server está pronto!"
               exit 0
@@ -110,7 +114,7 @@ jobs:
 
       - name: Criar banco de dados antes dos testes
         run: |
-          sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
         env:
