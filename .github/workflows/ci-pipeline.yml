@@ -60,7 +60,7 @@ jobs:
           SA_PASSWORD: "NovaSenhaForte123"
           ACCEPT_EULA: "Y"
           MSSQL_PID: "Developer"
-          MSSQL_MEMORY_LIMIT_MB: "2048"  # Aumenta limite de memória
+          MSSQL_MEMORY_LIMIT_MB: "2048"
         ports:
           - 1433:1433
         options: >-
@@ -82,25 +82,36 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
+      - name: Instalar SQLCMD (Ferramenta de Linha de Comando do SQL Server)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl apt-transport-https
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/22.04/mssql-server-2022.list)"
+          sudo apt-get update
+          sudo apt-get install -y mssql-tools unixodbc-dev
+          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+          source ~/.bashrc
+
       - name: Aguardar SQL Server inicializar manualmente
         run: |
           echo "Aguardando SQL Server iniciar..."
           sleep 30  # Aguarda 30s antes da primeira verificação
           for i in {1..15}; do
-            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
+            sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
             if [ $? -eq 0 ]; then
-              echo " SQL Server está pronto!"
+              echo "SQL Server está pronto!"
               exit 0
             fi
             echo "SQL Server ainda não está pronto... Tentativa $i de 15"
             sleep 5
           done
-          echo " Erro: SQL Server não inicializou a tempo"
+          echo "Erro: SQL Server não inicializou a tempo"
           exit 1
 
       - name: Criar banco de dados antes dos testes
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
         env:
