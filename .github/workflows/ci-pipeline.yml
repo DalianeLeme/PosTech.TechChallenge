@@ -18,7 +18,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar dependências
+      - name: Restaurar dependências (NuGet)
         run: dotnet restore
 
       - name: Compilar todos os projetos
@@ -36,6 +36,9 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
+
+      - name: Restaurar dependências (NuGet)
+        run: dotnet restore
 
       - name: Compilar testes unitários
         run: dotnet build --configuration Debug --no-restore
@@ -58,6 +61,9 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
+
+      - name: Restaurar dependências (NuGet)
+        run: dotnet restore
 
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
