@@ -62,7 +62,10 @@ jobs:
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "exit 0"
+          --health-cmd "echo 'SELECT 1' | /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -d master || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout código
@@ -79,7 +82,52 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
+      - name: Aguardar SQL Server inicializar
+        run: |
+          for i in {1..30}; do
+            nc -z sqlserver 1433 && echo "SQL Server está pronto!" && exit 0
+            echo "Aguardando SQL Server iniciar..."
+            sleep 5
+          done
+          echo "Erro: SQL Server não inicializou a tempo"
+          exit 1
+
+      - name: Criar banco de dados antes dos testes
+        run: |
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+
       - name: Executar testes de integração
         env:
-          ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
+
+  docker_build_push:
+    runs-on: ubuntu-latest
+    needs: [unit_tests, integration_tests]
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Autenticar no Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Construir e enviar imagens Docker
+        run: |
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest -f Contatos/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest -f Consulta/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest -f Atualizacao/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest -f Exclusao/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest -f Persistencia/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest

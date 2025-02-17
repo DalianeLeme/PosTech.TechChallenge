@@ -26,11 +26,10 @@ namespace UpdateContactService.Controllers
         );
 
         private static readonly Gauge MemoryUsageGauge = Metrics.CreateGauge(
-            "memory_usage_bytes_uppdate",
+            "memory_usage_bytes_update",
             "Uso de memória em tempo real em bytes"
         );
 
-        private static readonly Stopwatch Stopwatch = new();
         private readonly IHttpClientFactory _httpClientFactory;
 
         public MetricsController(IHttpClientFactory httpClientFactory)
@@ -55,7 +54,8 @@ namespace UpdateContactService.Controllers
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PutAsync("https://localhost:7252/UpdateContact/Update", payload);
+            // Alterado para usar o DNS do Kubernetes
+            var response = await client.PutAsync("http://update-contact-service/UpdateContact/Update", payload);
 
             stopwatch.Stop();
             var latency = stopwatch.Elapsed.TotalSeconds;
@@ -71,18 +71,25 @@ namespace UpdateContactService.Controllers
             return latency * 1000;
         }
 
-
         private float GetCpuUsage()
         {
-            var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-            cpuCounter.NextValue();
-            System.Threading.Thread.Sleep(1000);
-            return cpuCounter.NextValue();
+            var cpuStat1 = System.IO.File.ReadAllText("/proc/stat").Split("\n")[0].Split(" ", StringSplitOptions.RemoveEmptyEntries);
+            System.Threading.Thread.Sleep(100);
+            var cpuStat2 = System.IO.File.ReadAllText("/proc/stat").Split("\n")[0].Split(" ", StringSplitOptions.RemoveEmptyEntries);
+
+            float idle1 = float.Parse(cpuStat1[4]);
+            float total1 = cpuStat1.Skip(1).Select(float.Parse).Sum();
+
+            float idle2 = float.Parse(cpuStat2[4]);
+            float total2 = cpuStat2.Skip(1).Select(float.Parse).Sum();
+
+            return (1 - ((idle2 - idle1) / (total2 - total1))) * 100;
         }
 
         private long GetMemoryUsage()
         {
-            return Process.GetCurrentProcess().WorkingSet64;
+            var memoryUsage = System.IO.File.ReadAllText("/sys/fs/cgroup/memory/memory.usage_in_bytes");
+            return long.Parse(memoryUsage);
         }
 
         [HttpGet("metrics")]
