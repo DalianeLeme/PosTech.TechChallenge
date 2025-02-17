@@ -1,0 +1,23 @@
+# Usar a imagem base do .NET SDK para build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar arquivos do projeto para dentro do container
+COPY . ./
+
+# Restaurar dependências
+RUN dotnet restore
+
+# Construir os projetos de teste
+RUN dotnet build --configuration Debug --no-restore
+
+# Criar um novo estágio para execução dos testes
+FROM build AS testrunner
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Definir a entrada para rodar os testes
+CMD ["dotnet", "test", "--logger:trx"]

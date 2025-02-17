@@ -15,9 +15,12 @@ namespace TechChallenge.Application.IntegrationTests
 
         public ServiceIntegrationTests()
         {
+            var configFilePath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.Test.json");
+
             var configuration = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.Test.json")
+                .AddJsonFile(configFilePath, optional: false, reloadOnChange: true)
                 .Build();
+
 
             var options = new DbContextOptionsBuilder<ContactDbContext>()
                 .UseSqlServer(configuration.GetConnectionString("ConexaoPadrao"))
