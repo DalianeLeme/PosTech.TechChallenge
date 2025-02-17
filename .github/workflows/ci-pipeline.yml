@@ -1,4 +1,4 @@
-name: CI Pipeline
+Ôªøname: CI Pipeline
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout cÛdigo
+      - name: Checkout c√≥digo
         uses: actions/checkout@v3
 
       - name: Configurar .NET
@@ -18,7 +18,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar dependÍncias
+      - name: Restaurar depend√™ncias
         run: dotnet restore
 
       - name: Compilar todos os projetos
@@ -29,7 +29,7 @@ jobs:
     needs: build
 
     steps:
-      - name: Checkout cÛdigo
+      - name: Checkout c√≥digo
         uses: actions/checkout@v3
 
       - name: Configurar .NET
@@ -37,13 +37,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar dependÍncias
+      - name: Restaurar depend√™ncias
         run: dotnet restore
 
-      - name: Compilar testes unit·rios
+      - name: Compilar testes unit√°rios
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Executar testes unit·rios
+      - name: Executar testes unit√°rios
         run: |
           dotnet test TechChallenge.Application.UnitTests/TechChallenge.Application.UnitTests.csproj --configuration Debug --no-build --verbosity normal
           dotnet test TechChallenge.Domain.UnitTests/TechChallenge.Domain.UnitTests.csproj --configuration Debug --no-build --verbosity normal
@@ -62,13 +62,15 @@ jobs:
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "echo 'SELECT 1' | /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -d master || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
+          --name sqlserver
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q 'SELECT 1' || exit 1"
+          --health-interval 5s
+          --health-timeout 10s
+          --health-retries 20
+          --user root  # üöÄ For√ßa execu√ß√£o como root para evitar problemas de permiss√£o
 
     steps:
-      - name: Checkout cÛdigo
+      - name: Checkout c√≥digo
         uses: actions/checkout@v3
 
       - name: Configurar .NET
@@ -76,33 +78,33 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar dependÍncias
+      - name: Restaurar depend√™ncias
         run: dotnet restore
 
-      - name: Compilar testes de integraÁ„o
+      - name: Compilar testes de integra√ß√£o
         run: dotnet build --configuration Debug --no-restore
 
       - name: Aguardar SQL Server inicializar
         run: |
           echo "Aguardando SQL Server iniciar..."
-          sleep 30
-          for i in {1..10}; do
+          sleep 20  # Aguardar 20s antes de verificar se o SQL Server est√° pronto
+          for i in {1..15}; do
             /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
             if [ $? -eq 0 ]; then
-              echo "SQL Server est· pronto!"
+              echo "SQL Server est√° pronto!"
               exit 0
             fi
-            echo "Aguardando SQL Server estar pronto..."
+            echo "Aguardando SQL Server estar pronto... Tentativa $i de 15"
             sleep 5
           done
-          echo "Erro: SQL Server n„o inicializou a tempo"
+          echo "Erro: SQL Server n√£o inicializou a tempo"
           exit 1
 
       - name: Criar banco de dados antes dos testes
         run: |
           /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
-      - name: Executar testes de integraÁ„o
+      - name: Executar testes de integra√ß√£o
         env:
           ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
@@ -112,7 +114,7 @@ jobs:
     needs: [unit_tests, integration_tests]
 
     steps:
-      - name: Checkout cÛdigo
+      - name: Checkout c√≥digo
         uses: actions/checkout@v3
 
       - name: Autenticar no Docker Hub
