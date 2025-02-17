@@ -18,7 +18,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar dependências (NuGet)
+      - name: Restaurar dependências
         run: dotnet restore
 
       - name: Compilar todos os projetos
@@ -37,7 +37,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar dependências (NuGet)
+      - name: Restaurar dependências
         run: dotnet restore
 
       - name: Compilar testes unitários
@@ -84,9 +84,15 @@ jobs:
 
       - name: Aguardar SQL Server inicializar
         run: |
-          for i in {1..30}; do
-            nc -z sqlserver 1433 && echo "SQL Server está pronto!" && exit 0
-            echo "Aguardando SQL Server iniciar..."
+          echo "Aguardando SQL Server iniciar..."
+          sleep 30
+          for i in {1..10}; do
+            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
+            if [ $? -eq 0 ]; then
+              echo "SQL Server está pronto!"
+              exit 0
+            fi
+            echo "Aguardando SQL Server estar pronto..."
             sleep 5
           done
           echo "Erro: SQL Server não inicializou a tempo"
