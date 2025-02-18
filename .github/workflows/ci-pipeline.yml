@@ -1,121 +1,106 @@
-﻿name: CI - Build, Test, and Publish
+﻿name: CI Pipeline
 
 on:
   push:
     branches:
-      - main
-      - develop
-  pull_request:
-    branches:
-      - main
-      - develop
+      - master
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do repositório
-        uses: actions/checkout@v4
+      - name: Checkout código
+        uses: actions/checkout@v3
 
-      - name: Instalar .NET 7
+      - name: Configurar .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '7.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Build do projeto
-        run: dotnet build --configuration Release --no-restore
+      - name: Compilar todos os projetos
+        run: dotnet build --configuration Debug --no-restore
 
   unit_tests:
-    needs: build
     runs-on: ubuntu-latest
+    needs: build
 
     steps:
-      - name: Checkout do repositório
-        uses: actions/checkout@v4
+      - name: Checkout código
+        uses: actions/checkout@v3
 
-      - name: Instalar .NET 7
+      - name: Configurar .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '7.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restaurar dependências
         run: dotnet restore
 
+      - name: Compilar testes unitários
+        run: dotnet build --configuration Debug --no-restore
+
       - name: Executar testes unitários
-        run: dotnet test --configuration Release --no-restore --filter "Category=Unit"
+        run: |
+          dotnet test TechChallenge.Application.UnitTests/TechChallenge.Application.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+          dotnet test TechChallenge.Domain.UnitTests/TechChallenge.Domain.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+          dotnet test TechChallenge.Infrastructure.UnitTests/TechChallenge.Infrastructure.UnitTests.csproj --configuration Debug --no-build --verbosity normal
 
   integration_tests:
-    needs: build
     runs-on: ubuntu-latest
+    needs: build
 
     services:
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
-          SA_PASSWORD: "SenhaSegura@1234"
+          SA_PASSWORD: "NovaSenhaForte123"
           ACCEPT_EULA: "Y"
           MSSQL_PID: "Developer"
+          MSSQL_MEMORY_LIMIT_MB: "2048"
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P SenhaSegura@1234 -Q 'SELECT 1' || exit 1"
-          --health-interval 15s
-          --health-timeout 10s
-          --health-retries 20
-          --memory="3g"
+          --memory="2g"
           --cpus="2"
 
     steps:
-      - name: Checkout do repositório
-        uses: actions/checkout@v4
+      - name: Checkout código
+        uses: actions/checkout@v3
 
-      - name: Instalar .NET 7
+      - name: Configurar .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '7.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Aguardar SQL Server iniciar
+      - name: Compilar testes de integração
+        run: dotnet build --configuration Debug --no-restore
+
+      - name: Aguardar SQL Server inicializar
         run: |
-          echo "Esperando SQL Server iniciar..."
-          for i in {1..20}; do
-            if /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P SenhaSegura@1234 -Q "SELECT 1" &> /dev/null; then
-              echo "SQL Server está pronto"
-              exit 0
-            fi
-            echo "SQL Server ainda não está pronto... Tentativa $i de 20"
-            sleep 15
+          for i in {1..10}; do
+            nc -z sqlserver 1433 && echo "SQL Server está pronto!" && exit 0
+            echo "Tentativa $i de 10: SQL Server ainda não está acessível..."
+            sleep 5
           done
-          echo "Erro: SQL Server não inicializou a tempo"
+          echo "Erro: SQL Server não respondeu a tempo"
           exit 1
 
+      - name: Criar banco de dados antes dos testes
+        run: |
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+
+      - name: Aplicar migrações do Entity Framework
+        run: |
+          dotnet ef database update --project TechChallenge.Infrastructure/TechChallenge.Infrastructure.csproj --context ContactDbContext --connection "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+
       - name: Executar testes de integração
-        run: dotnet test --configuration Release --no-restore --filter "Category=Integration"
-
-  docker:
-    needs: [unit_tests, integration_tests]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do repositório
-        uses: actions/checkout@v4
-
-      - name: Login no Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build da imagem Docker
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/meu-microsservico:latest .
-
-      - name: Enviar imagem para Docker Hub
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/meu-microsservico:latest
+        env:
+          ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+        run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
