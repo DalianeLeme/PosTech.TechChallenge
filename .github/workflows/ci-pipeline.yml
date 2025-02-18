@@ -98,7 +98,7 @@ jobs:
       - name: Aguardar SQL Server iniciar com logs
         run: |
           echo "Aguardando SQL Server iniciar..."
-          sleep 60
+          sleep 90
           for i in {1..20}; do
             docker logs $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest") 2>&1 | grep -q "SQL Server is now ready for client connections" && echo "SQL Server está pronto!" && exit 0
             echo "SQL Server ainda não está pronto... Tentativa $i de 20"
@@ -107,19 +107,12 @@ jobs:
           echo "Erro: SQL Server não inicializou a tempo"
           exit 1
 
-      - name: Testar conexão com SQL Server antes de criar banco
-        run: |
-          for i in {1..10}; do
-            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1" && echo "Conexão bem-sucedida!" && exit 0
-            echo "Tentativa $i de 10 para conectar ao SQL Server"
-            sleep 5
-          done
-          echo "Erro: Falha ao conectar ao SQL Server"
-          exit 1
+      - name: Verificar se o container SQL Server está rodando
+        run: docker ps -a
 
       - name: Criar banco de dados antes dos testes
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          docker exec $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest") /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Aplicar migrações do Entity Framework
         run: |
