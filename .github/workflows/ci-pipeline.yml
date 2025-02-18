@@ -79,7 +79,7 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Instalar SQLCMD
+      - name: Instalar SQLCMD e verificar DNS
         run: |
           sudo apt-get update
           sudo apt-get install -y curl apt-transport-https
@@ -90,17 +90,18 @@ jobs:
           echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
           export PATH="$PATH:/opt/mssql-tools/bin"
           which sqlcmd
+          nslookup sqlserver || echo "Erro: DNS não conseguiu resolver sqlserver"
 
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Aguardar SQL Server inicializar manualmente
+      - name: Aguardar SQL Server iniciar com logs
         run: |
           echo "Aguardando SQL Server iniciar..."
-          sleep 30
-          for i in {1..15}; do
-            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1" && echo "SQL Server está pronto!" && exit 0
-            echo "SQL Server ainda não está pronto... Tentativa $i de 15"
+          sleep 40
+          for i in {1..20}; do
+            docker logs $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest") 2>&1 | grep -q "SQL Server is now ready for client connections" && echo "SQL Server está pronto!" && exit 0
+            echo "SQL Server ainda não está pronto... Tentativa $i de 20"
             sleep 5
           done
           echo "Erro: SQL Server não inicializou a tempo"
