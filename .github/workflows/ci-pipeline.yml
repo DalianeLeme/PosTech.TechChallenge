@@ -65,8 +65,8 @@ jobs:
           --health-retries 40
           --user root
           --memory=4g
-          --shm-size=1g  # Mais memória para evitar travamento
-          --restart always # Garante reinício caso falhe
+          --shm-size=1g
+          --restart always
 
     steps:
       - name: Checkout código
