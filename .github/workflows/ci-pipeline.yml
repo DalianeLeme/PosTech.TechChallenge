@@ -82,10 +82,10 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Testar conexão com SQL Server
+      - name: Aguardar SQL Server inicializar
         run: |
           for i in {1..10}; do
-            nc -z -v -w5 sqlserver 1433 && echo "SQL Server está acessível" && exit 0
+            nc -z sqlserver 1433 && echo "SQL Server está pronto!" && exit 0
             echo "Tentativa $i de 10: SQL Server ainda não está acessível..."
             sleep 5
           done
@@ -96,17 +96,11 @@ jobs:
         run: |
           /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
-      - name: Obter IP do SQL Server
-        run: |
-          export SQL_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest"))
-          echo "SQL Server IP: $SQL_IP"
-          echo "ConnectionStrings__ConexaoPadrao=Server=$SQL_IP,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True" >> $GITHUB_ENV
-
       - name: Aplicar migrações do Entity Framework
         run: |
-          dotnet ef database update --project TechChallenge.Infrastructure/TechChallenge.Infrastructure.csproj --context ContactDbContext --connection "$ConnectionStrings__ConexaoPadrao"
+          dotnet ef database update --project TechChallenge.Infrastructure/TechChallenge.Infrastructure.csproj --context ContactDbContext --connection "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
 
       - name: Executar testes de integração
         env:
-          ConnectionStrings__ConexaoPadrao: "Server=$SQL_IP,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal

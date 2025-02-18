@@ -23,8 +23,9 @@ namespace TechChallenge.Application.IntegrationTests
 
 
             var options = new DbContextOptionsBuilder<ContactDbContext>()
-                .UseSqlServer(configuration.GetConnectionString("ConexaoPadrao"))
+                .UseSqlServer("Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True")
                 .Options;
+
 
             _context = new ContactDbContext(options);
             _service = new ContactService(_context);
