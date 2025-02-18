@@ -60,13 +60,13 @@ jobs:
           SA_PASSWORD: "NovaSenhaForte123"
           ACCEPT_EULA: "Y"
           MSSQL_PID: "Developer"
-          MSSQL_MEMORY_LIMIT_MB: "2048"
+          MSSQL_MEMORY_LIMIT_MB: "3072"
           MSSQL_AGENT_ENABLED: "True"
         ports:
           - 1433:1433
         options: >-
-          --memory="2g"
-          --cpus="2"
+          --memory="3g"
+          --cpus="3"
 
     steps:
       - name: Checkout código
@@ -92,14 +92,7 @@ jobs:
           export PATH="$PATH:/opt/mssql-tools/bin"
           which sqlcmd
           nslookup sqlserver || echo "Erro: DNS não conseguiu resolver sqlserver"
-          echo "Verificando conectividade com o SQL Server..."
-          for i in {1..10}; do
-            telnet localhost 1433 && echo "Conexão com porta 1433 estabelecida!" && exit 0
-            echo "Tentativa $i de 10 para conectar ao SQL Server via telnet"
-            sleep 5
-          done
-          echo "Erro: SQL Server não está acessível via telnet"
-          exit 1
+          ping -c 4 sqlserver || echo "Erro: SQL Server não está respondendo ao ping"
 
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
@@ -119,12 +112,12 @@ jobs:
       - name: Criar banco de dados antes dos testes
         run: |
           /opt/mssql-tools/bin/sqlcmd -S localhost,1433 -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          /opt/mssql-tools/bin/sqlcmd -S localhost,1433 -U sa -P NovaSenhaForte123 -Q "SELECT name FROM sys.databases;"
 
       - name: Instalar dotnet-ef
         run: |
           dotnet tool install --global dotnet-ef
           export PATH="$HOME/.dotnet/tools:$PATH"
-          echo "Verificando instalação do dotnet-ef..."
           dotnet tool list -g
 
       - name: Aplicar migrações do Entity Framework
