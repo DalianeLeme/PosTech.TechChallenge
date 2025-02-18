@@ -43,8 +43,11 @@ jobs:
       - name: Compilar testes unitários
         run: dotnet build --configuration Debug --no-restore
 
+      - name: Listar arquivos de teste para debug
+        run: ls -R TechChallenge.*Tests/bin/Debug/net8.0
+
       - name: Executar testes unitários
-        run: dotnet test --configuration Debug --no-build --verbosity normal
+        run: dotnet test --configuration Debug --no-build --logger "trx;LogFileName=TestResults.trx" --verbosity detailed
 
   integration_tests:
     runs-on: ubuntu-latest
@@ -104,10 +107,13 @@ jobs:
         run: |
           /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
+      - name: Listar arquivos de teste para debug
+        run: ls -R TechChallenge.*Tests/bin/Debug/net8.0
+
       - name: Executar testes de integração
         env:
           ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
-        run: dotnet test --configuration Debug --no-build --verbosity normal
+        run: dotnet test --configuration Debug --no-build --logger "trx;LogFileName=IntegrationTestResults.trx" --verbosity detailed
 
   docker_build_push:
     runs-on: ubuntu-latest
