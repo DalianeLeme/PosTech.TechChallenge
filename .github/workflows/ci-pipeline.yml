@@ -60,13 +60,12 @@ jobs:
           SA_PASSWORD: "NovaSenhaForte123"
           ACCEPT_EULA: "Y"
           MSSQL_PID: "Developer"
-          MSSQL_MEMORY_LIMIT_MB: "3072"
-          MSSQL_AGENT_ENABLED: "True"
+          MSSQL_MEMORY_LIMIT_MB: "2048"
         ports:
           - 1433:1433
         options: >-
-          --memory="3g"
-          --cpus="3"
+          --memory="2g"
+          --cpus="2"
 
     steps:
       - name: Checkout código
@@ -80,43 +79,34 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Verificar status do SQL Server
-        run: |
-          echo "Verificando status do contêiner SQL Server..."
-          docker ps -a
-          docker logs $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest")
-          ping -c 4 sqlserver || echo "Erro: SQL Server não está respondendo ao ping"
-          netstat -tulnp | grep 1433 || echo "Erro: Porta 1433 não está aberta"
-          docker inspect sqlserver
+      - name: Compilar testes de integração
+        run: dotnet build --configuration Debug --no-restore
 
-      - name: Aguardar SQL Server iniciar
+      - name: Testar conexão com SQL Server
         run: |
-          echo "Aguardando SQL Server iniciar..."
-          sleep 120
-          for i in {1..20}; do
-            /opt/mssql-tools/bin/sqlcmd -S localhost,1433 -U sa -P NovaSenhaForte123 -Q "SELECT 1" && echo "SQL Server está pronto!" && exit 0
-            echo "SQL Server ainda não está pronto... Tentativa $i de 20"
-            sleep 6
+          for i in {1..10}; do
+            nc -z -v -w5 sqlserver 1433 && echo "SQL Server está acessível" && exit 0
+            echo "Tentativa $i de 10: SQL Server ainda não está acessível..."
+            sleep 5
           done
-          echo "Erro: SQL Server não inicializou a tempo"
+          echo "Erro: SQL Server não respondeu a tempo"
           exit 1
 
       - name: Criar banco de dados antes dos testes
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S localhost,1433 -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
-          /opt/mssql-tools/bin/sqlcmd -S localhost,1433 -U sa -P NovaSenhaForte123 -Q "SELECT name FROM sys.databases;"
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
-      - name: Instalar dotnet-ef
+      - name: Obter IP do SQL Server
         run: |
-          dotnet tool install --global dotnet-ef
-          export PATH="$HOME/.dotnet/tools:$PATH"
-          dotnet tool list -g
+          export SQL_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest"))
+          echo "SQL Server IP: $SQL_IP"
+          echo "ConnectionStrings__ConexaoPadrao=Server=$SQL_IP,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True" >> $GITHUB_ENV
 
       - name: Aplicar migrações do Entity Framework
         run: |
-          dotnet ef database update --project TechChallenge.Infrastructure/TechChallenge.Infrastructure.csproj --context ContactDbContext --connection "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          dotnet ef database update --project TechChallenge.Infrastructure/TechChallenge.Infrastructure.csproj --context ContactDbContext --connection "$ConnectionStrings__ConexaoPadrao"
 
       - name: Executar testes de integração
         env:
-          ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          ConnectionStrings__ConexaoPadrao: "Server=$SQL_IP,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
