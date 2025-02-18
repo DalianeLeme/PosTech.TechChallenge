@@ -40,19 +40,14 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Compilar testes
-        run: dotnet build --configuration Debug
+      - name: Compilar testes unitários
+        run: dotnet build --configuration Debug --no-restore
 
       - name: Executar testes unitários
         run: |
-          dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=TestResults.trx"
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "Testes unitários passaram com sucesso."
-          else
-            echo "Falha nos testes unitários! Código de saída: $EXIT_CODE"
-            exit $EXIT_CODE
-          fi
+          dotnet test TechChallenge.Application.UnitTests/TechChallenge.Application.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+          dotnet test TechChallenge.Domain.UnitTests/TechChallenge.Domain.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+          dotnet test TechChallenge.Infrastructure.UnitTests/TechChallenge.Infrastructure.UnitTests.csproj --configuration Debug --no-build --verbosity normal
 
   integration_tests:
     runs-on: ubuntu-latest
@@ -64,11 +59,13 @@ jobs:
         env:
           SA_PASSWORD: "NovaSenhaForte123"
           ACCEPT_EULA: "Y"
+          MSSQL_PID: "Developer"
+          MSSQL_MEMORY_LIMIT_MB: "2048"  # Aumenta limite de memória
         ports:
           - 1433:1433
         options: >-
-          --memory=4g
-          --shm-size=1g
+          --memory="2g"
+          --cpus="2"
 
     steps:
       - name: Checkout código
@@ -82,42 +79,33 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Criar e validar appsettings.Test.json
-        run: |
-          echo '{"ConnectionStrings": {"ConexaoPadrao": "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"}}' > appsettings.Test.json
-          cat appsettings.Test.json
+      - name: Compilar testes de integração
+        run: dotnet build --configuration Debug --no-restore
 
-      - name: Esperar SQL Server estar pronto manualmente
+      - name: Aguardar SQL Server inicializar manualmente
         run: |
           echo "Aguardando SQL Server iniciar..."
-          sleep 60
-          for i in {1..30}; do
-            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1" && echo "SQL Server pronto!" && exit 0
-            echo "Aguardando SQL Server... Tentativa $i de 30"
+          sleep 30  # Aguarda 30s antes da primeira verificação
+          for i in {1..15}; do
+            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1"
+            if [ $? -eq 0 ]; then
+              echo "✅ SQL Server está pronto!"
+              exit 0
+            fi
+            echo "⏳ SQL Server ainda não está pronto... Tentativa $i de 15"
             sleep 5
           done
-          echo "Erro: SQL Server não inicializou a tempo"
+          echo "❌ Erro: SQL Server não inicializou a tempo"
           exit 1
 
-      - name: Criar banco de dados
+      - name: Criar banco de dados antes dos testes
         run: |
           /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
-
-      - name: Compilar testes de integração
-        run: dotnet build --configuration Debug
 
       - name: Executar testes de integração
         env:
           ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
-        run: |
-          dotnet test --configuration Debug --no-fail-fast --verbosity detailed --logger "trx;LogFileName=IntegrationTestResults.trx"
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "Testes de integração passaram com sucesso."
-          else
-            echo "Falha nos testes de integração! Código de saída: $EXIT_CODE"
-            exit $EXIT_CODE
-          fi
+        run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
 
   docker_build_push:
     runs-on: ubuntu-latest
@@ -135,7 +123,17 @@ jobs:
 
       - name: Construir e enviar imagens Docker
         run: |
-          for service in Contatos Consulta Atualizacao Exclusao Persistencia; do
-            docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-${service,,}:latest -f $service/Dockerfile .
-            docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-${service,,}:latest
-          done
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest -f Contatos/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest -f Consulta/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest -f Atualizacao/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest -f Exclusao/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest
+          
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest -f Persistencia/Dockerfile .
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest
