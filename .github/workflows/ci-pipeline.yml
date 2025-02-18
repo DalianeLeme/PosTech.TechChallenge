@@ -66,6 +66,8 @@ jobs:
           --health-interval 10s
           --health-timeout 15s
           --health-retries 40
+          --user root  # Força execução como root para evitar problemas de permissão
+          --memory=4g  # Garante mais memória para o SQL Server
 
     steps:
       - name: Checkout código
@@ -82,32 +84,28 @@ jobs:
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug --no-restore
 
-      - name: Verificar consumo de CPU e Memória antes do SQL Server
+      - name: Exibir uso de memória e CPU antes do SQL Server iniciar
         run: |
-          echo "Monitorando uso de recursos..."
+          echo "🔍 Monitorando uso de memória e CPU..."
           free -m
           df -h
-          top -n 1 -b
+          top -n 1 -b | head -20
 
-      - name: Aguardar SQL Server iniciar
+      - name: Aguardar SQL Server estar pronto
         run: |
-          echo "Aguardando SQL Server iniciar..."
+          echo "⌛ Aguardando SQL Server iniciar..."
           for i in {1..30}; do
-            nc -z localhost 1433 && echo "✅ SQL Server está pronto!" && exit 0
-            echo "Aguardando SQL Server... Tentativa $i de 30"
+            docker logs $(docker ps -a -q --filter "name=sqlserver") | tail -n 20
+            nc -zv localhost 1433 && echo "✅ SQL Server está pronto!" && exit 0
+            echo "⌛ SQL Server ainda iniciando... Tentativa $i de 30"
             sleep 5
           done
-          echo " ERRO: SQL Server não inicializou a tempo"
+          echo "❌ ERRO: SQL Server não inicializou a tempo"
           exit 1
-
-      - name: Exibir logs do SQL Server em caso de falha
-        if: failure()
-        run: |
-          echo "Exibindo logs do SQL Server..."
-          docker logs $(docker ps -a -q --filter "name=sqlserver")
 
       - name: Criar banco de dados antes dos testes
         run: |
+          echo "🎯 Criando banco de dados 'Contacts'..."
           /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
