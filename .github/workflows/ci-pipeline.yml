@@ -64,6 +64,10 @@ jobs:
         ports:
           - 1433:1433
         options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
           --memory="2g"
           --cpus="2"
 
@@ -84,9 +88,12 @@ jobs:
 
       - name: Aguardar SQL Server inicializar
         run: |
-          for i in {1..10}; do
-            nc -z sqlserver 1433 && echo "SQL Server está pronto!" && exit 0
-            echo "Tentativa $i de 10: SQL Server ainda não está acessível..."
+          for i in {1..20}; do
+            if /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1" &> /dev/null; then
+              echo "SQL Server está pronto!"
+              exit 0
+            fi
+            echo "Tentativa $i de 20: SQL Server ainda não está acessível..."
             sleep 5
           done
           echo "Erro: SQL Server não respondeu a tempo"
@@ -94,7 +101,7 @@ jobs:
 
       - name: Criar banco de dados antes dos testes
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'Contacts') CREATE DATABASE Contacts;"
 
       - name: Aplicar migrações do Entity Framework
         run: |
