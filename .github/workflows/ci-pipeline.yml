@@ -45,7 +45,7 @@ jobs:
 
       - name: Executar testes unitários
         run: |
-          dotnet test --configuration Debug --no-fail-fast --verbosity detailed --logger "trx;LogFileName=TestResults.trx"
+          dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=TestResults.trx"
           EXIT_CODE=$?
           if [ $EXIT_CODE -eq 0 ]; then
             echo "Testes unitários passaram com sucesso."
