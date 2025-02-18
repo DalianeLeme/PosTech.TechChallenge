@@ -120,6 +120,13 @@ jobs:
         run: |
           /opt/mssql-tools/bin/sqlcmd -S localhost,1433 -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
+      - name: Instalar dotnet-ef
+        run: |
+          dotnet tool install --global dotnet-ef
+          export PATH="$HOME/.dotnet/tools:$PATH"
+          echo "Verificando instalação do dotnet-ef..."
+          dotnet tool list -g
+
       - name: Aplicar migrações do Entity Framework
         run: |
           dotnet ef database update --project TechChallenge.Infrastructure/TechChallenge.Infrastructure.csproj --context ContactDbContext --connection "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
