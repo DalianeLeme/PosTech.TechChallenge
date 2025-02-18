@@ -40,17 +40,14 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Compilar testes unitários explicitamente
-        run: dotnet build --configuration Debug --no-restore --output ./test_output
-
-      - name: Listar projetos de teste
+      - name: Listar projetos na solução
         run: dotnet sln list
 
-      - name: Listar arquivos de teste
-        run: find ./test_output -type f
+      - name: Compilar testes
+        run: dotnet build --configuration Debug
 
       - name: Executar testes unitários
-        run: dotnet test --configuration Debug --no-build --logger "trx;LogFileName=TestResults.trx" --verbosity detailed
+        run: dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=TestResults.trx"
 
   integration_tests:
     runs-on: ubuntu-latest
@@ -110,16 +107,13 @@ jobs:
         run: |
           /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
-      - name: Compilar testes de integração explicitamente
-        run: dotnet build --configuration Debug --no-restore --output ./test_output
-
-      - name: Listar arquivos de teste
-        run: find ./test_output -type f
+      - name: Compilar testes de integração
+        run: dotnet build --configuration Debug
 
       - name: Executar testes de integração
         env:
           ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
-        run: dotnet test --configuration Debug --no-build --logger "trx;LogFileName=IntegrationTestResults.trx" --verbosity detailed
+        run: dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=IntegrationTestResults.trx"
 
   docker_build_push:
     runs-on: ubuntu-latest
