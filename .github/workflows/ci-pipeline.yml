@@ -66,8 +66,8 @@ jobs:
           --health-interval 10s
           --health-timeout 15s
           --health-retries 40
-          --user root  # Força execução como root para evitar problemas de permissão
-          --memory=4g  # Garante mais memória para o SQL Server
+          --user root  
+          --memory=4g  
 
     steps:
       - name: Checkout código
@@ -93,19 +93,19 @@ jobs:
 
       - name: Aguardar SQL Server estar pronto
         run: |
-          echo "⌛ Aguardando SQL Server iniciar..."
+          echo "Aguardando SQL Server iniciar..."
           for i in {1..30}; do
             docker logs $(docker ps -a -q --filter "name=sqlserver") | tail -n 20
             nc -zv localhost 1433 && echo "✅ SQL Server está pronto!" && exit 0
-            echo "⌛ SQL Server ainda iniciando... Tentativa $i de 30"
+            echo " SQL Server ainda iniciando... Tentativa $i de 30"
             sleep 5
           done
-          echo "❌ ERRO: SQL Server não inicializou a tempo"
+          echo " ERRO: SQL Server não inicializou a tempo"
           exit 1
 
       - name: Criar banco de dados antes dos testes
         run: |
-          echo "🎯 Criando banco de dados 'Contacts'..."
+          echo " Criando banco de dados 'Contacts'..."
           /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
