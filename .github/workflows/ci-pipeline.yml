@@ -40,9 +40,6 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Listar projetos na solução
-        run: dotnet sln list
-
       - name: Compilar testes
         run: dotnet build --configuration Debug
 
@@ -88,15 +85,17 @@ jobs:
           echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
           source ~/.bashrc
 
+      - name: Criar e validar appsettings.Test.json
+        run: |
+          echo '{"ConnectionStrings": {"ConexaoPadrao": "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"}}' > appsettings.Test.json
+          cat appsettings.Test.json
+
       - name: Esperar SQL Server estar pronto manualmente
         run: |
           echo "Aguardando SQL Server iniciar..."
-          sleep 30
+          sleep 60
           for i in {1..30}; do
-            if docker logs $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest") 2>&1 | grep -q "SQL Server is now ready for client connections"; then
-              echo "SQL Server está pronto!"
-              exit 0
-            fi
+            /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "SELECT 1" && echo "SQL Server pronto!" && exit 0
             echo "Aguardando SQL Server... Tentativa $i de 30"
             sleep 5
           done
@@ -105,14 +104,14 @@ jobs:
 
       - name: Criar banco de dados
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Compilar testes de integração
         run: dotnet build --configuration Debug
 
       - name: Executar testes de integração
         env:
-          ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
+          ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
         run: dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=IntegrationTestResults.trx"
 
   docker_build_push:
