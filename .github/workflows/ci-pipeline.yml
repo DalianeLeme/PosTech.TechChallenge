@@ -44,10 +44,7 @@ jobs:
         run: dotnet build --configuration Debug --no-restore
 
       - name: Executar testes unitários
-        run: |
-          dotnet test TechChallenge.Application.UnitTests/TechChallenge.Application.UnitTests.csproj --configuration Debug --no-build --verbosity normal
-          dotnet test TechChallenge.Domain.UnitTests/TechChallenge.Domain.UnitTests.csproj --configuration Debug --no-build --verbosity normal
-          dotnet test TechChallenge.Infrastructure.UnitTests/TechChallenge.Infrastructure.UnitTests.csproj --configuration Debug --no-build --verbosity normal
+        run: dotnet test --configuration Debug --no-build --verbosity normal
 
   integration_tests:
     runs-on: ubuntu-latest
@@ -62,12 +59,13 @@ jobs:
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q 'SELECT 1'"
+          --health-cmd "echo 'SELECT 1' | /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 || exit 1"
           --health-interval 10s
           --health-timeout 15s
-          --health-retries 40
-          --user root  
-          --memory=4g  
+          --health-retries 60
+          --user root
+          --memory=4g
+          --shm-size=512m
 
     steps:
       - name: Checkout código
@@ -81,37 +79,30 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Compilar testes de integração
-        run: dotnet build --configuration Debug --no-restore
-
-      - name: Exibir uso de memória e CPU antes do SQL Server iniciar
-        run: |
-          echo "🔍 Monitorando uso de memória e CPU..."
-          free -m
-          df -h
-          top -n 1 -b | head -20
-
-      - name: Aguardar SQL Server estar pronto
+      - name: Aguardar SQL Server inicializar completamente
         run: |
           echo "Aguardando SQL Server iniciar..."
-          for i in {1..30}; do
-            docker logs $(docker ps -a -q --filter "name=sqlserver") | tail -n 20
-            nc -zv localhost 1433 && echo "✅ SQL Server está pronto!" && exit 0
-            echo " SQL Server ainda iniciando... Tentativa $i de 30"
+          sleep 40  # Aguardar mais tempo para garantir que o SQL Server esteja pronto
+          for i in {1..15}; do
+            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1"
+            if [ $? -eq 0 ]; then
+              echo "SQL Server está pronto!"
+              exit 0
+            fi
+            echo "Aguardando SQL Server estar pronto... Tentativa $i de 15"
             sleep 5
           done
-          echo " ERRO: SQL Server não inicializou a tempo"
+          echo "Erro: SQL Server não inicializou a tempo"
           exit 1
 
       - name: Criar banco de dados antes dos testes
         run: |
-          echo " Criando banco de dados 'Contacts'..."
           /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
       - name: Executar testes de integração
         env:
           ConnectionStrings__ConexaoPadrao: "Server=localhost,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
-        run: dotnet test TechChallenge.Application.IntegrationTests/TechChallenge.Application.IntegrationTests.csproj --configuration Debug --no-build --verbosity normal
+        run: dotnet test --configuration Debug --no-build --verbosity normal
 
   docker_build_push:
     runs-on: ubuntu-latest
