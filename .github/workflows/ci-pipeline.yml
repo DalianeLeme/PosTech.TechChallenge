@@ -63,10 +63,8 @@ jobs:
           --health-interval 10s
           --health-timeout 15s
           --health-retries 40
-          --user root
           --memory=4g
           --shm-size=1g
-          --restart always
 
     steps:
       - name: Checkout código
@@ -80,39 +78,20 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Instalar SQLCMD (caso necessário)
+      - name: Esperar SQL Server estar pronto
         run: |
-          if ! command -v sqlcmd &> /dev/null
-          then
-            echo "Instalando SQLCMD..."
-            sudo apt-get update
-            sudo apt-get install -y curl apt-transport-https
-            curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-            sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/20.04/mssql-server-2022.list)"
-            sudo apt-get update
-            sudo apt-get install -y mssql-tools unixodbc-dev
-            echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-            source ~/.bashrc
-          else
-            echo "SQLCMD já instalado"
-          fi
-
-      - name: Aguardar SQL Server inicializar completamente
-        run: |
-          echo "Aguardando SQL Server iniciar..."
-          for i in {1..15}; do
-            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1"
-            if [ $? -eq 0 ]; then
+          for i in {1..30}; do
+            if /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1"; then
               echo "SQL Server está pronto!"
               exit 0
             fi
-            echo "Aguardando SQL Server estar pronto... Tentativa $i de 15"
+            echo "Aguardando SQL Server... Tentativa $i de 30"
             sleep 5
           done
           echo "Erro: SQL Server não inicializou a tempo"
           exit 1
 
-      - name: Criar banco de dados antes dos testes
+      - name: Criar banco de dados
         run: |
           /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "CREATE DATABASE Contacts;"
 
@@ -137,17 +116,7 @@ jobs:
 
       - name: Construir e enviar imagens Docker
         run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest -f Contatos/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-contatos:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest -f Consulta/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-consulta:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest -f Atualizacao/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-atualizacao:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest -f Exclusao/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-exclusao:latest
-          
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest -f Persistencia/Dockerfile .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-persistencia:latest
+          for service in Contatos Consulta Atualizacao Exclusao Persistencia; do
+            docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-${service,,}:latest -f $service/Dockerfile .
+            docker push ${{ secrets.DOCKER_HUB_USERNAME }}/techchallenge-${service,,}:latest
+          done
