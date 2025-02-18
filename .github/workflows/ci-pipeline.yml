@@ -44,7 +44,15 @@ jobs:
         run: dotnet build --configuration Debug
 
       - name: Executar testes unitários
-        run: dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=TestResults.trx"
+        run: |
+          dotnet test --configuration Debug --no-fail-fast --verbosity detailed --logger "trx;LogFileName=TestResults.trx"
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "Testes unitários passaram com sucesso."
+          else
+            echo "Falha nos testes unitários! Código de saída: $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
 
   integration_tests:
     runs-on: ubuntu-latest
@@ -74,17 +82,6 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Instalar SQLCMD
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl apt-transport-https
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/20.04/prod.list)"
-          sudo apt-get update
-          sudo apt-get install -y mssql-tools unixodbc-dev
-          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-          source ~/.bashrc
-
       - name: Criar e validar appsettings.Test.json
         run: |
           echo '{"ConnectionStrings": {"ConexaoPadrao": "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"}}' > appsettings.Test.json
@@ -112,7 +109,15 @@ jobs:
       - name: Executar testes de integração
         env:
           ConnectionStrings__ConexaoPadrao: "Server=sqlserver,1433; Database=Contacts; User Id=sa; Password=NovaSenhaForte123; TrustServerCertificate=True"
-        run: dotnet test --configuration Debug --verbosity detailed --logger "trx;LogFileName=IntegrationTestResults.trx"
+        run: |
+          dotnet test --configuration Debug --no-fail-fast --verbosity detailed --logger "trx;LogFileName=IntegrationTestResults.trx"
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "Testes de integração passaram com sucesso."
+          else
+            echo "Falha nos testes de integração! Código de saída: $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
 
   docker_build_push:
     runs-on: ubuntu-latest
