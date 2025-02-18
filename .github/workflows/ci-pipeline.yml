@@ -59,13 +59,14 @@ jobs:
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "echo 'SELECT 1' | /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 || exit 1"
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q 'SELECT 1' || exit 1"
           --health-interval 10s
           --health-timeout 15s
-          --health-retries 60
+          --health-retries 40
           --user root
           --memory=4g
-          --shm-size=512m
+          --shm-size=1g  # Mais memória para evitar travamento
+          --restart always # Garante reinício caso falhe
 
     steps:
       - name: Checkout código
@@ -79,10 +80,26 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
+      - name: Instalar SQLCMD (caso necessário)
+        run: |
+          if ! command -v sqlcmd &> /dev/null
+          then
+            echo "Instalando SQLCMD..."
+            sudo apt-get update
+            sudo apt-get install -y curl apt-transport-https
+            curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+            sudo add-apt-repository "$(curl -s https://packages.microsoft.com/config/ubuntu/20.04/mssql-server-2022.list)"
+            sudo apt-get update
+            sudo apt-get install -y mssql-tools unixodbc-dev
+            echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+            source ~/.bashrc
+          else
+            echo "SQLCMD já instalado"
+          fi
+
       - name: Aguardar SQL Server inicializar completamente
         run: |
           echo "Aguardando SQL Server iniciar..."
-          sleep 40  # Aguardar mais tempo para garantir que o SQL Server esteja pronto
           for i in {1..15}; do
             /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1"
             if [ $? -eq 0 ]; then
