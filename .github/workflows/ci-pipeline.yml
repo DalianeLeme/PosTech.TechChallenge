@@ -59,10 +59,6 @@ jobs:
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q 'SELECT 1' || exit 1"
-          --health-interval 10s
-          --health-timeout 15s
-          --health-retries 40
           --memory=4g
           --shm-size=1g
 
@@ -78,10 +74,12 @@ jobs:
       - name: Restaurar dependências
         run: dotnet restore
 
-      - name: Esperar SQL Server estar pronto
+      - name: Esperar SQL Server estar pronto manualmente
         run: |
+          echo "Aguardando SQL Server iniciar..."
+          sleep 30
           for i in {1..30}; do
-            if /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P NovaSenhaForte123 -Q "SELECT 1"; then
+            if docker logs $(docker ps -q --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest") 2>&1 | grep -q "SQL Server is now ready for client connections"; then
               echo "SQL Server está pronto!"
               exit 0
             fi
