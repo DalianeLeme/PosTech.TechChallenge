@@ -11,12 +11,13 @@
 * [Fase 1](#Fase-1)
 * [Fase 2](#Fase-2)
 * [Fase 3](#Fase-3)
+* [Fase 4](#Fase-4)
 * [Técnicas e tecnologias utilizadas](#Técnicas-e-tecnologias-utilizadas)
 
 # :pushpin: Descrição do projeto
 API em .NET8 feita para entrega dos Tech Chanllenges da Pós Tech FIAP. <br>
 Um aplicativo de gerenciamento de contatos regionais. </br>
-O projeto é divido em 5 fases, cada fase vai representar uma evolução do projeto, implementando novos comportamentos e funcionalidades.
+O projeto é divido em 4 fases, cada fase vai representar uma evolução do projeto, implementando novos comportamentos e funcionalidades.
 <br></br>
 
 # 🥚 Fase 1
@@ -95,24 +96,24 @@ As principais alterações foram:
 
 - `Prometheus`: Agora cada microsserviço tem seu endpoint /metrics, ou seja, cada microsserviço possui suas métricas. </br>
 :small_red_triangle_down: Métricas Create: </br>
-**create_contact_request_duration_milliseconds:** Latência do endpoint de create </br>
+`**create_contact_request_duration_milliseconds:** Latência do endpoint de create </br>
 **contacts_create_request_total:** Contagem de requisições por statusCode. </br>
 **cpu_usage_percentage_create:** Uso da CPU em tempo real em porcentagem </br>
 **memory_usage_bytes_create:** Uso de memória em tempo real em bytes </br>
 
-:small_red_triangle_down: Métricas Update: </br>
+  :small_red_triangle_down: Métricas Update: </br>
 **update_contact_request_duration_milliseconds:** Latência do endpoint de update </br>
 **contacts_update_request_total:** Contagem de requisições por statusCode. </br>
 **cpu_usage_percentage_update:** Uso da CPU em tempo real em porcentagem </br>
 **memory_usage_bytes_uppdate:** Uso de memória em tempo real em bytes </br>
 
-:small_red_triangle_down: Métricas Get: </br>
+  :small_red_triangle_down: Métricas Get: </br>
 **get_contact_request_duration_milliseconds:** Latência do endpoint de get </br>
 **contacts_get_request_total:** Contagem de requisições por statusCode. </br>
 **cpu_usage_percentage_get:** Uso da CPU em tempo real em porcentagem </br>
 **memory_usage_bytes_get:** Uso de memória em tempo real em bytes </br>
 
-:small_red_triangle_down: Métricas Delete: </br>
+  :small_red_triangle_down: Métricas Delete: </br>
 **delete_contact_request_duration_milliseconds:** Latência do endpoint de get </br>
 **contacts_delete_request_total:** Contagem de requisições por statusCode. </br>
 **cpu_usage_percentage_delete:** Uso da CPU em tempo real em porcentagem </br>
@@ -130,11 +131,25 @@ As principais alterações foram:
 <br></br>
 
 # :chicken: Fase 4
-:construction: Em construção :construction:
+Implementação de Kubernetes para gerenciamento de conteinerização, orquestração e escalabilidade. </br>
+
+- `Manifestos`: Cada Microsserviço possui seu conjunto de arquivos yaml para configuração de conteineres. </br>
+  :small_blue_diamond: `configmap.yaml`: Onde se encontram as strings de conexão com o rabbitMQ e banco SQL Server. </br>
+  :small_blue_diamond: `deployment.yaml`: Configuração de número de réplicas e especifica qual a imagem docker usada para rodar o microsserviço. </br>
+  :small_blue_diamond: `service.yaml`: Configuração para comunicação entre microsserviços dentro do cluster. </br>
+
+- `Dockerfile`: Cada microsserviço possui seu DockerFile usado para subir a imagem no docker hub. </br>
+
+- `RabbitMQ`, `SQLServer`, `Prometheus`, `Grafana`: Foram migrados para uso em container tambem, deixando de ser local. </br>
+  :small_orange_diamond: Foi criada uma pasta na raiz `/Kubernetes` onde estão os arquivos .yaml de configuração dos conteineres dos mesmos. </br>
+  :small_orange_diamond: Gráficos e métricas não foram alterados. </br>
+
+- `Pipeline`: Tambem migrada para rodar no docker. </br>
+<br></br>
 
 # :heavy_check_mark: Técnicas e tecnologias utilizadas
 `.NET8` `C#` `SQL Server` `GitHub Actions` `Prometheus` `Grafana` `Testes unitários` `Testes de Integração` `xUnit` `EntityFramework`
-`FluentValidator` `RabbitMq` `Eventos`
+`FluentValidator` `RabbitMQ` `Eventos` `Kubernetes` `Docker`
 <br></br>
 
 # :busts_in_silhouette: Autores
